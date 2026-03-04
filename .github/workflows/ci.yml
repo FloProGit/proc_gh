@@ -1,0 +1,85 @@
+name: CI
+
+on:
+    push:
+        branches: [main, develop]
+    pull_request:
+        branches: [main, develop]
+
+jobs:
+
+    lint:
+        name: Code Style
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v4
+            - uses: shivammathur/setup-php@v2
+              with:
+                  php-version: '8.4'
+                  coverage: none
+            - uses: actions/cache@v4
+              with:
+                  path: vendor
+                  key: composer-${{ hashFiles('composer.lock') }}
+            - run: composer install --no-interaction --prefer-dist
+            - run: vendor/bin/php-cs-fixer fix --dry-run --diff
+
+    phpstan:
+        name: PHPStan
+        runs-on: ubuntu-latest
+        needs: lint
+        steps:
+            - uses: actions/checkout@v4
+            - uses: shivammathur/setup-php@v2
+              with:
+                  php-version: '8.4'
+                  coverage: none
+            - uses: actions/cache@v4
+              with:
+                  path: vendor
+                  key: composer-${{ hashFiles('composer.lock') }}
+            - run: composer install --no-interaction --prefer-dist
+            - run: vendor/bin/phpstan analyse --no-progress
+
+    tests:
+        name: Tests
+        runs-on: ubuntu-latest
+        needs: phpstan
+
+        services:
+            postgres:
+                image: postgres:15
+                env:
+                    POSTGRES_USER: symfony
+                    POSTGRES_PASSWORD: symfony
+                    POSTGRES_DB: proc_gh_test
+                ports: ['5432:5432']
+                options: --health-cmd pg_isready --health-interval 10s --health-timeout 5s --health-retries 5
+
+        steps:
+            - uses: actions/checkout@v4
+            - uses: shivammathur/setup-php@v2
+              with:
+                  php-version: '8.4'
+                  coverage: xdebug
+            - uses: actions/cache@v4
+              with:
+                  path: vendor
+                  key: composer-${{ hashFiles('composer.lock') }}
+            - run: composer install --no-interaction --prefer-dist
+
+            - name: Generate JWT keys
+              run: php bin/console lexik:jwt:generate-keypair --env=test
+
+            - name: Setup database
+              run: |
+                  php bin/console doctrine:schema:create --env=test
+                  php bin/console doctrine:fixtures:load --env=test --no-interaction
+              env:
+                  DATABASE_URL: postgresql://symfony:symfony@localhost:5432/proc_gh?serverVersion=15
+
+            - name: Run tests
+              run: php bin/phpunit --coverage-text
+              env:
+                  DATABASE_URL: postgresql://symfony:symfony@localhost:5432/proc_gh?serverVersion=15
+                  XDEBUG_MODE: coverage
