@@ -32,7 +32,7 @@ class UserFixtures extends Fixture
 
         // admin user
         $admin = new User();
-        $user->setEmail('admin@test.com');
+        $admin->setEmail('admin@test.com');
         $admin->setFirstName('Admin');
         $admin->setLastName('User');
         $admin->setRoles(['ROLE_ADMIN']);
