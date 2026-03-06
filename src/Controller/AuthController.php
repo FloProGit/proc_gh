@@ -10,6 +10,7 @@ use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Http\Attribute\CurrentUser;
 
+#[Route('/api')]
 final class AuthController extends AbstractController
 {
     #[Route('/login', name: 'api_login', methods: ['POST'])]
@@ -22,6 +23,7 @@ final class AuthController extends AbstractController
         throw new \LogicException('This should never be reached.');
     }
 
+    #[Route('/me', name: 'api_me', methods: ['GET'])]
     public function me(#[CurrentUser] ?User $user): JsonResponse
     {
         if (!$user instanceof User) {
